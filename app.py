@@ -1,10 +1,9 @@
 import streamlit as st
 from gtts import gTTS
-import os
-import base64
+from io import BytesIO
 
 # Supported languages
-languages = {
+LANGUAGES = {
     "English": "en",
     "Urdu": "ur",
     "Hindi": "hi",
@@ -15,30 +14,31 @@ languages = {
     "Chinese": "zh-cn"
 }
 
-# App UI
+# UI Setup
 st.set_page_config(page_title="Text to MP3 Converter", layout="centered")
 st.title("🎙️ Text to MP3 Converter")
 
 text_input = st.text_area("Enter text here:", height=200)
-
-language = st.selectbox("Choose language:", list(languages.keys()))
-lang_code = languages[language]
+language = st.selectbox("Choose language:", list(LANGUAGES.keys()))
+lang_code = LANGUAGES[language]
 
 if st.button("Convert to MP3"):
-    if text_input.strip() == "":
+    if not text_input.strip():
         st.error("❌ Text field is empty.")
     else:
         try:
-            tts = gTTS(text=text_input.strip(), lang=lang_code)
-            filename = "output.mp3"
-            tts.save(filename)
+            tts = gTTS(text_input.strip(), lang=lang_code)
+            mp3_fp = BytesIO()
+            tts.write_to_fp(mp3_fp)        # Write into memory
+            mp3_fp.seek(0)                # Rewind pointer
 
-            with open(filename, "rb") as f:
-                mp3_data = f.read()
-                b64 = base64.b64encode(mp3_data).decode()
-                href = f'<a href="data:audio/mp3;base64,{b64}" download="{filename}">🎧 Download MP3</a>'
-                st.success("✅ Conversion successful!")
-                st.markdown(href, unsafe_allow_html=True)
-
+            st.success("✅ MP3 is ready!")
+            st.audio(mp3_fp, format="audio/mp3")
+            st.download_button(
+                label="🎧 Download MP3",
+                data=mp3_fp,
+                file_name="converted.mp3",
+                mime="audio/mpeg"
+            )
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"❌ Conversion failed: {e}")
