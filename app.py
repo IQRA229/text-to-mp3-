@@ -1,13 +1,10 @@
 import streamlit as st
 from gtts import gTTS
 from io import BytesIO
-import speech_recognition as sr
+import textwrap
 
-# App title
-st.title("🎙️ Text & Speech to MP3 Converter")
-
-# Language options
-language_options = {
+# 🌐 Language Options
+LANGUAGES = {
     "English": "en",
     "Urdu": "ur",
     "Hindi": "hi",
@@ -18,55 +15,46 @@ language_options = {
     "Chinese": "zh-cn"
 }
 
-# Language selection
-language = st.selectbox("🌐 Choose Language", list(language_options.keys()))
-lang_code = language_options[language]
+# 🎯 Streamlit Page Config
+st.set_page_config(page_title="Text-to-MP3 Converter", page_icon="🔊", layout="wide")
+st.title("🔊 Text-to-MP3 Converter")
+st.markdown("Convert **long text (up to 100,000 words)** to speech in multiple languages and download the MP3 file.")
 
-# Tabs for input modes
-tab1, tab2 = st.tabs(["📝 Text Input", "🎤 Speech Input"])
+# 🔠 Input Field
+text_input = st.text_area("Paste your text here (max 100,000 words):", height=400)
 
-# Text Input Tab
-with tab1:
-    text = st.text_area("Enter your text here:")
-    if st.button("Convert Text to MP3"):
-        if not text.strip():
-            st.warning("Please enter some text.")
-        else:
-            try:
-                tts = gTTS(text=text, lang=lang_code)
-                mp3_bytes = BytesIO()
-                tts.write_to_fp(mp3_bytes)
-                mp3_bytes.seek(0)
-                st.audio(mp3_bytes, format="audio/mp3")
-                st.download_button("⬇️ Download MP3", data=mp3_bytes, file_name="output.mp3", mime="audio/mpeg")
-            except Exception as e:
-                st.error(f"Conversion failed: {e}")
+# 🌍 Language Selection
+language = st.selectbox("Select language:", list(LANGUAGES.keys()))
+lang_code = LANGUAGES[language]
 
-# Speech Input Tab
-with tab2:
-    st.info("This will use your microphone to record speech.")
-    if st.button("🎤 Record and Convert"):
-        recognizer = sr.Recognizer()
+# 🧪 Sample
+with st.expander("▶️ Hear Sample Voice (English)"):
+    sample_text = "This is a sample text-to-speech conversion using gTTS."
+    sample_tts = gTTS(sample_text, lang="en")
+    sample_audio = BytesIO()
+    sample_tts.save(sample_audio)
+    sample_audio.seek(0)
+    st.audio(sample_audio, format="audio/mp3")
+
+# 🚀 Convert and Download
+if st.button("🎧 Convert to MP3"):
+    word_count = len(text_input.split())
+    if not text_input.strip():
+        st.warning("Please enter some text first.")
+    elif word_count > 100000:
+        st.error(f"Too many words! You entered {word_count}. Limit is 100,000.")
+    else:
         try:
-            with sr.Microphone() as source:
-                st.info("Recording... Please speak.")
-                audio = recognizer.listen(source, timeout=5)
-                st.success("Recording complete. Processing...")
-                text = recognizer.recognize_google(audio)
-                st.write("Recognized Text:", text)
-
-                tts = gTTS(text=text, lang=lang_code)
-                mp3_bytes = BytesIO()
-                tts.write_to_fp(mp3_bytes)
-                mp3_bytes.seek(0)
-                st.audio(mp3_bytes, format="audio/mp3")
-                st.download_button("⬇️ Download MP3", data=mp3_bytes, file_name="speech_output.mp3", mime="audio/mpeg")
-        except sr.UnknownValueError:
-            st.error("Could not understand the audio.")
-        except sr.RequestError as e:
-            st.error(f"Speech recognition failed: {e}")
+            tts = gTTS(text=text_input, lang=lang_code, slow=False)
+            mp3_fp = BytesIO()
+            tts.save(mp3_fp)
+            mp3_fp.seek(0)
+            st.success("✅ MP3 file is ready!")
+            st.audio(mp3_fp, format="audio/mp3")
+            st.download_button("📥 Download MP3", mp3_fp, file_name="converted.mp3", mime="audio/mpeg")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Conversion failed: {e}")
+
 
 
 
