@@ -14,31 +14,29 @@ LANGUAGES = {
     "Chinese": "zh-cn"
 }
 
-# UI Setup
-st.set_page_config(page_title="Text to MP3 Converter", layout="centered")
+# Streamlit UI
 st.title("🎙️ Text to MP3 Converter")
 
-text_input = st.text_area("Enter text here:", height=200)
-language = st.selectbox("Choose language:", list(LANGUAGES.keys()))
+text_input = st.text_area("📝 Enter text here:", height=200)
+language = st.selectbox("🌐 Choose language:", list(LANGUAGES.keys()))
 lang_code = LANGUAGES[language]
 
-if st.button("Convert to MP3"):
+if st.button("🔄 Convert to MP3"):
     if not text_input.strip():
-        st.error("❌ Text field is empty.")
+        st.error("❌ Text input is empty.")
     else:
         try:
-            tts = gTTS(text_input.strip(), lang=lang_code)
+            tts = gTTS(text=text_input.strip(), lang=lang_code)
             mp3_fp = BytesIO()
-            tts.write_to_fp(mp3_fp)        # Write into memory
-            mp3_fp.seek(0)                # Rewind pointer
+            tts.write_to_fp(mp3_fp)
+            mp3_fp.seek(0)
 
-            st.success("✅ MP3 is ready!")
-            st.audio(mp3_fp, format="audio/mp3")
+            st.audio(mp3_fp, format='audio/mp3')
             st.download_button(
-                label="🎧 Download MP3",
+                label="⬇️ Download MP3",
                 data=mp3_fp,
                 file_name="converted.mp3",
                 mime="audio/mpeg"
             )
         except Exception as e:
-            st.error(f"❌ Conversion failed: {e}")
+            st.error(f"🚫 Error: {e}")
