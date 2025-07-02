@@ -1,42 +1,44 @@
 import streamlit as st
 from gtts import gTTS
-from io import BytesIO
+import os
+from tempfile import NamedTemporaryFile
 
-# Supported languages
-LANGUAGES = {
-    "English": "en",
-    "Urdu": "ur",
-    "Hindi": "hi",
-    "Arabic": "ar",
-    "French": "fr",
-    "German": "de",
-    "Spanish": "es",
-    "Chinese": "zh-cn"
-}
+# App title
+st.title("🗣️ Text to Speech Converter (MP3)")
 
-# Streamlit UI
-st.title("🎙️ Text to MP3 Converter")
+# Step 1: Input text
+text = st.text_area("Enter text to convert into speech", height=200)
 
-text_input = st.text_area("📝 Enter text here:", height=200)
-language = st.selectbox("🌐 Choose language:", list(LANGUAGES.keys()))
-lang_code = LANGUAGES[language]
+# Step 2: Choose language
+lang = st.selectbox("Select language", [
+    ("English", "en"),
+    ("Urdu", "ur"),
+    ("Hindi", "hi"),
+    ("Spanish", "es"),
+    ("French", "fr"),
+], format_func=lambda x: x[0])
 
-if st.button("🔄 Convert to MP3"):
-    if not text_input.strip():
-        st.error("❌ Text input is empty.")
+# Step 3: Convert to MP3
+if st.button("🎧 Convert to MP3"):
+    if not text.strip():
+        st.warning("Please enter some text.")
     else:
         try:
-            tts = gTTS(text=text_input.strip(), lang=lang_code)
-            mp3_fp = BytesIO()
-            tts.write_to_fp(mp3_fp)
-            mp3_fp.seek(0)
+            # Create TTS
+            tts = gTTS(text=text, lang=lang[1])
+            
+            # Save to temporary file
+            with NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+                tts.save(tmp_file.name)
+                st.success("✅ Conversion successful!")
+                
+                # Playback audio
+                audio_file = open(tmp_file.name, "rb")
+                audio_bytes = audio_file.read()
+                st.audio(audio_bytes, format="audio/mp3")
+                
+                # Download link
+                st.download_button("⬇️ Download MP3", audio_bytes, file_name="speech.mp3")
 
-            st.audio(mp3_fp, format='audio/mp3')
-            st.download_button(
-                label="⬇️ Download MP3",
-                data=mp3_fp,
-                file_name="converted.mp3",
-                mime="audio/mpeg"
-            )
         except Exception as e:
-            st.error(f"🚫 Error: {e}")
+            st.error(f"Error during conversion: {e}")
