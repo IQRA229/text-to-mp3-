@@ -1,51 +1,86 @@
 import streamlit as st
-from gtts import gTTS
+import speech_recognition as sr
+from pydub import AudioSegment, silence
 import os
-from tempfile import NamedTemporaryFile
+import tempfile
+import time
 
-# Constants
 MAX_WORDS = 10000
 
-# App title
-st.title("🗣️ Text to Speech Converter (MP3)")
+st.title("🎙️ MP3/WAV to Text Converter ")
 
-# Step 1: Input text
-text = st.text_area("Enter text to convert into speech (Max 10,000 words)", height=200)
+lang_code = st.selectbox("Choose Language", [
+    ("English", "en-US"),
+    ("Urdu", "ur-PK")
+], format_func=lambda x: x[0])[1]
 
-# Step 2: Choose language
-lang = st.selectbox("Select language", [
-    ("English", "en"),
-    ("Urdu", "ur"),
-    ("Hindi", "hi"),
-    ("Spanish", "es"),
-    ("French", "fr"),
-], format_func=lambda x: x[0])
+uploaded_file = st.file_uploader("Upload an audio file (MP3 or WAV)", type=["mp3", "wav"])
 
-# Step 3: Convert to MP3
-if st.button("🎧 Convert to MP3"):
-    word_count = len(text.strip().split())
+if uploaded_file:
+    st.audio(uploaded_file)
 
-    if not text.strip():
-        st.warning("⚠️ Please enter some text.")
-    elif word_count > MAX_WORDS:
-        st.error(f"❌ Word limit exceeded. You entered {word_count} words. Limit is {MAX_WORDS}.")
-    else:
-        try:
-            # Create TTS
-            tts = gTTS(text=text, lang=lang[1])
+    input_path = None
+    wav_path = None
+    full_text = ""
 
-            # Save to temporary file
-            with NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                tts.save(tmp_file.name)
-                st.success("✅ Conversion successful!")
+    try:
+        # Create a temp file path for the uploaded file
+        fd_input, input_path = tempfile.mkstemp(suffix="." + uploaded_file.name.split(".")[-1])
+        os.close(fd_input)  # Close file descriptor
+        with open(input_path, "wb") as f:
+            f.write(uploaded_file.read())
 
-                # Playback audio
-                with open(tmp_file.name, "rb") as audio_file:
-                    audio_bytes = audio_file.read()
-                    st.audio(audio_bytes, format="audio/mp3")
+        # Convert to WAV using pydub
+        audio = AudioSegment.from_file(input_path)
+        fd_wav, wav_path = tempfile.mkstemp(suffix=".wav")
+        os.close(fd_wav)
+        audio.export(wav_path, format="wav")
 
-                    # Download link
-                    st.download_button("⬇️ Download MP3", audio_bytes, file_name="speech.mp3")
+        recognizer = sr.Recognizer()
+        processed_audio = AudioSegment.from_wav(wav_path)
 
-        except Exception as e:
-            st.error(f"❌ Error during conversion: {e}")
+        st.info("Splitting audio by silence (simulated speaker separation)...")
+        chunks = silence.split_on_silence(processed_audio, min_silence_len=700, silence_thresh=-40)
+
+        for i, chunk in enumerate(chunks):
+            fd_chunk, chunk_path = tempfile.mkstemp(suffix=".wav")
+            os.close(fd_chunk)
+            chunk.export(chunk_path, format="wav")
+
+            with sr.AudioFile(chunk_path) as source:
+                audio_data = recognizer.record(source)
+                try:
+                    part_text = recognizer.recognize_google(audio_data, language=lang_code)
+                    full_text += f"Speaker {i+1}: {part_text}\n"
+                except sr.UnknownValueError:
+                    full_text += f"Speaker {i+1}: [Unclear]\n"
+
+            os.remove(chunk_path)
+
+        word_count = len(full_text.split())
+        if word_count > MAX_WORDS:
+            st.warning(f"Text exceeds {MAX_WORDS} words. Showing first {MAX_WORDS}.")
+            full_text = ' '.join(full_text.split()[:MAX_WORDS])
+
+        st.success("Transcription complete!")
+        st.text_area("Transcribed Text", full_text, height=400)
+
+        st.download_button(
+            label="📥 Download Transcription as .txt",
+            data=full_text,
+            file_name="transcription.txt",
+            mime="text/plain"
+        )
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
+    finally:
+        time.sleep(0.5)
+        if input_path and os.path.exists(input_path):
+            try: os.remove(input_path)
+            except: pass
+        if wav_path and os.path.exists(wav_path):
+            try: os.remove(wav_path)
+            except: pass
+
